@@ -1,16 +1,16 @@
 mod word_count;
 
-use crate::word_count::{CountMode, WordCount, WordCountError};
+use crate::word_count::{CountMode, Count, WordCountError};
 use std::collections::HashSet;
 use std::env::args;
 use std::path::PathBuf;
 use word_count::WordCounter;
 
-fn format_line(line: &Result<WordCount, WordCountError>) -> String {
+fn format_line(line: &Result<Count, WordCountError>, modes: &HashSet<CountMode>) {
     match line {
         Err(e) => {
             if let WordCountError::FileNotFound(file) = e {
-                format!(
+                println!(
                     "wc: {}: open: No such file or directory",
                     file.to_string_lossy()
                 )
@@ -20,32 +20,29 @@ fn format_line(line: &Result<WordCount, WordCountError>) -> String {
         }
 
         Ok(word_count) => {
-            let mut s = String::new();
-            if let Some(line_count) = word_count.counts().get(&CountMode::Line) {
-                s.push_str(&format!("{line_count:>8}"));
+            if modes.contains(&CountMode::Line) {
+                print!("{:>8}", word_count.line_count());
             }
 
-            if let Some(word_count) = word_count.counts().get(&CountMode::Word) {
-                s.push_str(&format!("{word_count:>8}"));
+            if modes.contains(&CountMode::Word) {
+                print!("{:>8}", word_count.word_count());
             }
 
-            if let Some(char_count) = word_count.counts().get(&CountMode::Character) {
-                s.push_str(&format!("{char_count:>8}"));
+            if modes.contains(&CountMode::Character) {
+                print!("{:>8}", word_count.char_count());
             }
 
             if let Some(file_name) = word_count.file_name() {
-                s.push_str(&format!(" {}", file_name.to_string_lossy()));
+                print!(" {}", file_name.to_string_lossy());
             }
 
-            s.push('\n');
-
-            s
+            println!();
         }
     }
 }
 
 fn main() -> Result<(), WordCountError> {
-    //                  the first arg is the exe name
+    //           the first arg is the exe name
     let args = args().skip(1).collect::<Vec<_>>();
     let wc = if args.len() == 0 {
         WordCounter::default()
@@ -75,13 +72,8 @@ fn main() -> Result<(), WordCountError> {
         WordCounter::new(&files, modes)
     };
 
-    let output = wc
-        .count()
-        .iter()
-        .map(|c| format_line(c))
-        .collect::<String>();
+    wc.count().iter().for_each(|counts| format_line(counts, wc.modes()));
 
-    print!("{output}");
 
     Ok(())
 }

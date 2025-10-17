@@ -66,20 +66,6 @@ impl Count {
 
         total
     }
-
-    fn count_bytes(mut self, bytes: &[u8]) -> Self {
-        for b in bytes {
-            self.char_count += 1;
-            if *b == b'\n' {
-                self.word_count += 1;
-                self.line_count += 1;
-            } else if b.is_ascii_whitespace() {
-                self.word_count += 1;
-            }
-        }
-
-        self
-    }
 }
 
 #[derive(Debug)]

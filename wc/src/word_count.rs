@@ -167,7 +167,7 @@ impl WordCounter {
             .lock()
             .read_to_end(&mut bytes)
             .map_err(|_e| WordCountError::Unknown)?;
-        let wc = Count::new(None).count_bytes(&bytes);
+        let wc = Count::new_bytes(None, &bytes);
 
         Ok(wc)
     }
@@ -181,7 +181,7 @@ impl WordCounter {
             }
         })?;
 
-        let wc = Count::new(Some(path.into())).count_bytes(&bytes);
+        let wc = Count::new_bytes(Some(path.into()), &bytes);
 
         Ok(wc)
     }

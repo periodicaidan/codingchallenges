@@ -6,18 +6,51 @@ use std::env::args;
 use std::path::PathBuf;
 use word_count::WordCounter;
 
+// TODO: Use a different error type here
+//  Some errors are recoverable and others are not; `main` should return Err on unrecoverable errors
+fn main() {
+    //           the first arg is the exe name
+    let args = args().skip(1).collect::<Vec<_>>();
+    let wc = if args.len() == 0 {
+        WordCounter::default()
+    } else {
+        let mut files: Vec<PathBuf> = Vec::with_capacity(args.len());
+        let mut modes: HashSet<CountMode> = HashSet::new();
+        let mut reading_opts = true;
+
+        for arg in args {
+            if !arg.starts_with('-') {
+                reading_opts = false;
+            }
+
+            if reading_opts {
+                for char in arg.chars().skip(1) {
+                    match CountMode::from_char(char) {
+                        Ok(mode) => { modes.insert(mode); },
+                        Err(e) => {
+                            println!("wc: {}", e);
+                            die_usage()
+                        }
+                    }
+                }
+            }
+
+            files.push(arg.into());
+        }
+
+        if modes.is_empty() {
+            modes = HashSet::from([CountMode::Line, CountMode::Word, CountMode::Character]);
+        }
+
+        WordCounter::new(&files, modes)
+    };
+
+    wc.count().iter().for_each(|counts| format_line(counts, wc.modes()));
+}
+
 fn format_line(line: &Result<Count, WordCountError>, modes: &HashSet<CountMode>) {
     match line {
-        Err(e) => {
-            if let WordCountError::FileNotFound(file) = e {
-                println!(
-                    "wc: {}: open: No such file or directory",
-                    file.to_string_lossy()
-                )
-            } else {
-                unreachable!()
-            }
-        }
+        Err(e) => println!("wc: {}", e),
 
         Ok(word_count) => {
             if modes.contains(&CountMode::Line) {
@@ -41,39 +74,7 @@ fn format_line(line: &Result<Count, WordCountError>, modes: &HashSet<CountMode>)
     }
 }
 
-fn main() -> Result<(), WordCountError> {
-    //           the first arg is the exe name
-    let args = args().skip(1).collect::<Vec<_>>();
-    let wc = if args.len() == 0 {
-        WordCounter::default()
-    } else {
-        let mut files: Vec<PathBuf> = Vec::with_capacity(args.len());
-        let mut modes: HashSet<CountMode> = HashSet::new();
-        let mut reading_opts = true;
-
-        for arg in args {
-            if !arg.starts_with('-') {
-                reading_opts = false;
-            }
-
-            if reading_opts {
-                for char in arg.chars().skip(1) {
-                    modes.insert(CountMode::from_char(char)?);
-                }
-            }
-
-            files.push(arg.into());
-        }
-
-        if modes.is_empty() {
-            modes = HashSet::from([CountMode::Line, CountMode::Word, CountMode::Character]);
-        }
-
-        WordCounter::new(&files, modes)
-    };
-
-    wc.count().iter().for_each(|counts| format_line(counts, wc.modes()));
-
-
-    Ok(())
+fn die_usage() -> ! {
+    println!("usage: wc [-lcmw] [file ...]");
+    std::process::exit(1)
 }

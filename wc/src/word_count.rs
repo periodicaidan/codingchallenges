@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::collections::HashSet;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::io::{ErrorKind, Read, stdin};
 use std::path::{Path, PathBuf};
 
@@ -53,9 +54,7 @@ impl Count {
         counts
     }
 
-    fn new_total(
-        counts: &[Result<Count, WordCountError>],
-    ) -> Self {
+    fn new_total(counts: &[Result<Count, WordCountError>]) -> Self {
         let mut total = Self::new(Some("total".into()));
         for maybe_count in counts {
             let Ok(count) = maybe_count else { continue };
@@ -68,6 +67,9 @@ impl Count {
     }
 }
 
+// TODO: Support counting by multibyte characters
+//  This may require a lot of reworking, and may result in no longer using a HashSet but rather
+//  using a struct of which count modes are on/off, or for chars, how they should be counted.
 #[derive(Debug)]
 pub struct WordCounter {
     modes: HashSet<CountMode>,
@@ -106,9 +108,29 @@ pub enum StreamSource {
 
 #[derive(Debug)]
 pub enum WordCountError {
-    FileNotFound(PathBuf),
+    Io(Option<PathBuf>, std::io::Error),
     IllegalOption(char),
     Unknown,
+}
+
+impl Display for WordCountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WordCountError::Io(file_name, e) => write!(
+                f,
+                "{}: {}",
+                file_name
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or("stdin".to_string()),
+                e.kind()
+            ),
+            WordCountError::IllegalOption(char) => write!(f, "illegal option -- {}", char),
+            WordCountError::Unknown => write!(f, "unknown error"),
+        }?;
+
+        Ok(())
+    }
 }
 
 impl WordCounter {
@@ -152,20 +174,15 @@ impl WordCounter {
         stdin()
             .lock()
             .read_to_end(&mut bytes)
-            .map_err(|_e| WordCountError::Unknown)?;
+            .map_err(|e| WordCountError::Io(None, e))?;
         let wc = Count::new_bytes(None, &bytes);
 
         Ok(wc)
     }
 
     fn count_in_file(&self, path: &Path) -> Result<Count, WordCountError> {
-        let bytes = std::fs::read(path).map_err(|e| {
-            if e.kind() == ErrorKind::NotFound {
-                WordCountError::FileNotFound(path.to_owned())
-            } else {
-                WordCountError::Unknown
-            }
-        })?;
+        let bytes = std::fs::read(path)
+            .map_err(|e| WordCountError::Io(Some(path.to_owned()), e))?;
 
         let wc = Count::new_bytes(Some(path.into()), &bytes);
 

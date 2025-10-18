@@ -1,16 +1,13 @@
 mod word_count;
 
-use crate::word_count::{CountMode, Count, WordCountError};
+use crate::word_count::{Count, CountMode, WordCountError};
 use std::collections::HashSet;
-use std::env::args;
 use std::path::PathBuf;
 use word_count::WordCounter;
 
-// TODO: Use a different error type here
-//  Some errors are recoverable and others are not; `main` should return Err on unrecoverable errors
 fn main() {
     //           the first arg is the exe name
-    let args = args().skip(1).collect::<Vec<_>>();
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
     let wc = if args.len() == 0 {
         WordCounter::default()
     } else {
@@ -26,7 +23,9 @@ fn main() {
             if reading_opts {
                 for char in arg.chars().skip(1) {
                     match CountMode::from_char(char) {
-                        Ok(mode) => { modes.insert(mode); },
+                        Ok(mode) => {
+                            modes.insert(mode);
+                        }
                         Err(e) => {
                             println!("wc: {}", e);
                             die_usage()
@@ -45,7 +44,9 @@ fn main() {
         WordCounter::new(&files, modes)
     };
 
-    wc.count().iter().for_each(|counts| format_line(counts, wc.modes()));
+    wc.count()
+        .iter()
+        .for_each(|counts| format_line(counts, wc.modes()));
 }
 
 fn format_line(line: &Result<Count, WordCountError>, modes: &HashSet<CountMode>) {
